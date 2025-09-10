@@ -1,0 +1,310 @@
+Step 1: Update and Install Dependencies
+
+sudo apt update -y && sudo apt upgrade -y
+sudo apt install -y git apt-transport-https ca-certificates curl software-properties-common
+
+Step 2: Install Docker
+# Add Docker repo key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+# Add Docker repo
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+# Install Docker
+sudo apt update -y
+sudo apt install -y docker-ce
+
+# Start Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Allow ubuntu user to run docker
+sudo usermod -aG docker ubuntu
+
+Step 3: Install Kubernetes (Minikube + kubectl)
+1)Install kubectl(same version as minikube cluster)
+        curl -LO "https://dl.k8s.io/release/v1.33.1/bin/linux/amd64/kubectl"
+     chmod +x kubectl
+     sudo mv kubectl /usr/local/bin/
+     kubectl version --client
+
+
+2) Install Minikube
+  curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+  sudo install minikube-linux-amd64 /usr/local/bin/minikube
+  minikube version
+3) Start Minikube(as ubuntu,not root)
+    minikube start --driver=docker --memory=4096 --cpus=2
+
+kubectl config get-contexts
+
+kubectl config use-context minikube
+
+kubectl get nodes
+
+Step 4: Install Ansible
+
+lets now install ansible in ansible server (execute the below command only in master machine) 
+
+sudo su 
+ apt update -y
+ apt-get install -y software-properties-common
+ apt-add-repository ppa:ansible/ansible
+  apt-get update
+  apt-get install -y ansible
+
+# ansible --version 
+# we will now define the hosts  from the master machine (ansible server) 
+
+vi /etc/ansible/hosts
+
+[ansiblegroup]
+Privateip of node1
+Privateip of node2
+
+Copy the private ip of the node 1
+
+
+Create a user in Ansible server (master machine) and the nodes
+
+# adduser devops 
+(put password as devops)
+And press enter three times and press y 
+Similary create the same username and pass In the nodes as well
+Perform same task in node2 as well
+(use same username and pass in master and the nodes) 
+
+We will now configure sshd configuration in master and node machines 
+
+            # vi /etc/ssh/sshd_config
+press i
+ 
+On line 34 change to PermitRootlogin yes and remove #
+ 
+Remove # from line 38
+ 
+On line 57 enable PasswordAuthentication as yes by removing #
+ 
+
+(perform same activity in node1 and node2 as well)
+
+(with latest ubuntu these steps need to be added up in master and nodes) 
+#vi /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+Change password authentication to yes
+# service ssh restart
+
+We will now give sudo permission to the “devops” user in ansible and the nodes
+
+# visudo 
+
+ 
+
+Scroll down to user priviledge specification and add below line 
+
+devops ALL=(ALL:ALL) NOPASSWD:ALL
+
+ 
+
+Press ctrl x and then press Y and enter
+
+(We need to perform the same activity for node1 and node2)
+
+
+From  Ansible server we will generate the trust relationship(we will generate a key in the master and paste it in the ansible nodes to establish the ssh connection w/o putting password) with the nodes 
+
+In Ansible-server (master machine):
+
+# su – devops
+# ssh-keygen 
+(above command generate the key in master machine) 
+(press enter three times)
+
+ 
+Now we need to copy the keypair in the node 1 and node2 
+
+Go to Ansible-server(master) 
+
+# ls -a
+# cd .ssh
+   
+ 
+
+# ssh-copy-id devops@privateipofnode1
+
+Step 5: Install Jenkins
+
+sudo apt update 
+sudo apt install openjdk-17-jre
+curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | sudo tee \
+  /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt-get update
+sudo apt-get install jenkins
+
+sudo systemctl enable jenkins
+sudo systemctl start jenkins
+
+Step 6: Clone GitHub Repo in EC2
+
+git clone https://github.com/akshu20791/apachewebsite.git
+cd apachewebsite
+
+Step 7: Create Ansible Playbook (install_apache.yml)
+
+Inside project folder:
+
+---
+- hosts: localhost
+  become: yes
+  tasks:
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+        update_cache: yes
+
+    - name: Copy website files
+      copy:
+        src: ./index.html
+        dest: /var/www/html/index.html
+
+Step 8: Create Kubernetes Deployment (k8s-deployment.yaml)
+
+Inside repo:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apache-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: apache
+  template:
+    metadata:
+      labels:
+        app: apache
+    spec:
+      containers:
+      - name: apache
+        image: <DOCKERHUB_USER>/apache-website:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apache-service
+spec:
+  type: NodePort
+  selector:
+    app: apache
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
+
+
+Step 9: Configure Jenkins Pipeline (Jenkinsfile)
+
+In repo root (Jenkinsfile):
+
+pipeline {
+    agent any
+
+    environment {
+        IMAGE = "your_dockerhub_user/apache-website"
+        TAG = "v${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/akshu20791/apachewebsite.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $IMAGE:$TAG .'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker push $IMAGE:$TAG'
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh 'sed -i "s|<DOCKERHUB_USER>/apache-website:latest|$IMAGE:$TAG|g" k8s-deployment.yaml'
+                sh 'kubectl apply -f k8s-deployment.yaml'
+            }
+        }
+
+        stage('Run Ansible for Apache VM Install') {
+            steps {
+                sh 'ansible-playbook install_apache.yml'
+            }
+        }
+    }
+}
+
+git add Jenkinsfile install_apache.yml k8s-deployment.yaml
+git commit -m "Added Jenkinsfile, Ansible playbook, and K8s deployment"
+git push origin master
+
+Install the plugins in Jenkins
+
+Git Plugin
+GitHub Plugin
+Pipeline
+Pipeline: Stage View
+Credentials Binding Plugin
+SSH Agent Plugin
+Docker Pipeline
+Kubernetes CLI Plugin
+Ansible Plugin
+
+Step 10: Configure Jenkins Credentials
+Inside Jenkins UI:
+Add Docker Hub creds → ID: dockerhub-creds
+Add GitHub webhook (so Jenkins triggers on push)
+
+
+Step 11: Run Pipeline
+
+Go to Jenkins → New Item → Pipeline → point to GitHub repo
+
+Build pipeline → It will:
+
+Pull code from GitHub
+
+Build Docker image
+
+Push to Docker Hub
+
+Deploy to Kubernetes
+
+Install Apache on EC2 via Ansible
+
+Step 12: Verify
+
+kubectl get pods
+kubectl get svc
+
+Access website:
+
+http://<EC2_PUBLIC_IP>:30080
+
+Apache installed via Ansible can be checked:
+
+curl http://localhost
+
