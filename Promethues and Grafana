@@ -1,0 +1,198 @@
+Docker Monitoring using promethues and Grafana
+
+Create two ubuntu machines – Docker-server(prometheusmachine)  , Grafanamonitoring-machine
+ In both the machines
+sudo su
+apt update
+In Grafanamachine I will install Grafana and in docker-server I will install docker and Prometheus
+
+Grafana machine:
+wget https://dl.grafana.com/enterprise/release/grafana-enterprise-8.4.4.linux-amd64.tar.gz
+ls
+tar -zxvf grafana-enterprise-8.4.4.linux-amd64.tar.gz
+ls
+cd grafana-8.4.4
+./bin/grafana-server
+
+Grafana servers works on port 3000…so in security group enable port 3000
+
+<<public ip>>:3000
+
+
+admin
+pass: admin
+
+
+#now lets setup the docker-server
+apt update 
+apt install docker.io -y
+service docker start
+docker run -dt --name c01 ubuntu 
+
+docker run -dt --name c02 ubuntu
+
+
+
+wget https://github.com/prometheus/prometheus/releases/download/v2.34.0/prometheus-2.34.0.linux-amd64.tar.gz
+
+ls
+tar zxvf prometheus-2.34.0.linux-amd64.tar.gz
+
+ls
+cd prometheus-2.34.0.linux-amd64
+ls
+
+##WE NEED TO TELL DOCKER AS WELL THAT PROMETHEUS WOULD BE TRACKING DOCKER VIA PORT 9323 port
+
+vi /etc/docker/daemon.json
+press I to insert
+{
+        "metrics-addr" : "0.0.0.0:9323",
+        "experimental" : true
+}
+
+
+To come out of this file press escape and :wq
+
+
+service docker restart
+
+cd prometheus-2.34.0.linux-amd64   (if u r not inside the prometheus folder)
+ls 
+(you will see Prometheus.yml file…it contains all the configuration of Prometheus. Here we have to tell that metrics would be coming from port 9323)
+Before that,
+go to docker-server machine and enable the port 9323 and port 9090 
+
+
+
+Copy the ip of docker machine and http://3.15.194.85:9323/metrics
+You should see the docker stats
+
+
+vi prometheus.yml
+
+
+
+- job_name: "docker"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9323"]
+
+(just take care of one thing that – job_name should be exactly the job_name of the Prometheus) 
+
+
+
+./prometheus      (this will start the prometheus)
+
+
+
+Now open public ip:9090  to check if Prometheus is opening or not
+
+
+
+
+
+
+
+Now lets go to Grafana and we will give source as Prometheus to Grafana so that it can create beautiful graphs out of it
+
+
+
+(select data sources)
+
+
+
+
+
+http://<ip address>:9090/
+
+
+
+
+
+
+
+
+
+
+
+
+
+engine_daemon_container_states_containers{state="stopped"}
+
+
+
+
+
+engine_daemon_container_states_containers{state="running"}
+
+Monitor and create a dashboard of machine metrics like cpu , ram etc
+
+Navigate to the terminal of the prometheus machine on the Ubuntu system and execute the following command to download Node Exporter:
+sudo wget https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz
+Run the following command to extract the downloaded Node Exporter package:
+sudo tar xvfz node_exporter-*.*-amd64.tar.gz
+
+3 . Lets create a new folder with name node_exporter and copy contet of node_exporter-1.8.2.linux-arm64 to that folder to make things easy 
+sudo rm node_exporter-1.8.2.linux-amd64.tar.gz
+sudo mkdir node_exporter
+sudo mv node_exporter-*.linux-amd64/* ./node_exporter
+
+4. Execute the following commands to change the directory and start the node_exporter in the background, redirecting output to /dev/null:
+cd node_exporter
+sudo ./node_exporter > /dev/null 2>&1 &
+
+
+5. Verify that Node Exporter is running by fetching its metrics with the following command:
+curl http://localhost:9100/metrics
+
+6. we will now go to prometheus directory and in yaml file we will update target as 9100 port
+cd ..
+cd prometheus-2.34.0.linux-amd64
+
+
+
+vi prometheus.yml
+
+
+
+./prometheus
+
+
+
+
+# lets create a dashboard in Grafana….
+There is a dashboard by default for node in grafana we can directly import
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
