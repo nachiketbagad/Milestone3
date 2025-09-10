@@ -33,14 +33,20 @@ Step 3: Install Kubernetes (Minikube + kubectl)
   curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
   sudo install minikube-linux-amd64 /usr/local/bin/minikube
   minikube version
+
+Run the below commands in ubuntu user
+sudo su - ubuntu
 3) Start Minikube(as ubuntu,not root)
-    minikube start --driver=docker --memory=4096 --cpus=2
+    minikube start --driver=docker --memory=3072 --cpus=2
 
 kubectl config get-contexts
 
 kubectl config use-context minikube
 
 kubectl get nodes
+
+Again go back to root user
+sudo su 
 
 Step 4: Install Ansible
 
