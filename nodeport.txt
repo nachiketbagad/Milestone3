@@ -1,0 +1,62 @@
+Nodeport : Nodeport service exposes a hostport/nodeport on every node in the cluster, also creates the ClusterIP service that can forward the request to single/multiple backend pods
+
+> NodePort srrvice is a extension of ClusterIp service. A clusterIp service to which the nodeport service routes is automatically created
+
+vi mydep11.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pyapp23feb
+  labels:
+    app: npapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: npapp
+  template:
+    metadata:
+      labels:
+        app: npapp
+    spec:
+      containers:
+        - name: myapp-con
+          image: lerndevops/samplepyapp:v2
+          ports:
+            - containerPort: 3000
+
+
+kubectl apply -f mydep11.yml
+
+kubectl get pods -o wide
+
+kubectl get pods 
+
+vi myservice.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: pyapp-23
+spec:
+  type: NodePort
+  selector:
+    app: npapp
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+
+
+kubectl apply -f myservice.yml
+
+kubectl get svc
+
+kubectl get pods -o wide
+
+curl ipaddressofpod:3000
+
+curl ipaddressofservcie:80
+
+copy publicip of any node:port exposes in service
