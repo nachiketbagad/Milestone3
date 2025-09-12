@@ -1,0 +1,333 @@
+Step1: create  2 ec2 instamce with name master and node 
+Fork this https://github.com/akshu20791/apachewebsite
+
+ 
+
+
+ 
+
+
+ 
+
+ 
+
+Now Connect it
+And do the basic opearation in master and node
+Sudo su
+Apt update
+
+ 
+
+
+ 
+Now install
+1)	Docker (master machine)
+2)	Kubernates
+3)	Jenkins (master machine)
+4)	Ansible 
+apt install docker.io -y
+
+ 
+Now for jenkins 
+wget https://raw.githubusercontent.com/RaksAniruddha/Deployment-script/refs/heads/main/jenkins.sh 
+ls
+chmod +x jenkins.sh
+ls
+./jenkins.sh
+
+ 
+
+<your_master_machine_public_ip>:8080 paste it on browser
+
+ 
+
+
+ 
+Cat /var/lib/jenkins/secrets/initialAdminPassword
+Copy the password and paste it -> install suggested plugin -> set credential
+
+ 
+
+I am giving all as admin
+Save and continue -> start jenkins
+
+  
+
+ 
+
+Now install kubernates 
+For this follow  https://github.com/RaksAniruddha/Deployment-script/blob/main/readme-k8s
+
+ 
+
+ 
+
+ 
+
+ 
+
+Now install ansible
+Do this basic operation
+apt update
+apt-get install software-properties-common
+apt-add-repository ppa:ansible/ansible
+apt-get update
+apt-get install -y ansible 
+
+vi /etc/ansible/hosts
+
+ 
+Copy the content and make a inventory.ini file on forked repository and paste it
+[ansiblegroup]
+<privateipofnode> ansible_user=devops
+
+[ansiblegroup:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+
+ 
+
+Visudo 
+vi /etc/ssh/sshd_config
+vi /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+service ssh restart
+
+ 
+ 
+
+
+ 
+
+ 
+
+Adduser devops
+Su – devops
+Ssh -keygen
+
+ 
+
+
+Ls -a
+Cd .ssh
+Ssh-copy-id devops@<private_ip_of_node2>
+
+
+ 
+
+ 
+
+ 
+
+
+
+
+Install plugin 
+
+ 
+
+
+ 
+
+ 
+After install restart Jenkins
+
+ 
+In your terminal write
+docker login -u <your_dockerhub_username>
+sudo usermod -aG docker Jenkins
+
+sudo systemctl restart Jenkins
+
+  
+
+Then login into Jenkins-> go to credentials -> click on global-> add creadentials->username with password (username your dockerhub user name) your docker hub password  id : docker-> create
+
+  
+
+Then again click on add creadential-> kind: ssh username with private key->
+For secret text go to your master machine  su – devops
+Cd .ssh
+Cat id_ed25519 
+Copy it and paste it on secret at Jenkins-> id: ansible-ssh -> create
+
+ 
+
+s 
+ 
+
+Then again click on add credentials-> kind: secret-file->
+On master
+cat ~/.kube/config
+copy the whole thing end to end and create a file with name kubeconfig with no exrention->
+upload the file and id: kubeconfig
+ 
+
+ 
+
+ 
+
+Now write down the deployment script and service script and upload it on git hub foked repo
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apachewebsite-deployment
+  labels:
+    app: apachewebsite
+spec:
+  replicas: 2   # number of pods
+  selector:
+    matchLabels:
+      app: apachewebsite
+  template:
+    metadata:
+      labels:
+        app: apachewebsite
+    spec:
+      containers:
+      - name: apachewebsite
+        image: anirudev/apachewebsite:latest
+        ports:
+        - containerPort: 80
+
+
+
+Service file
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: apachewebsite-service
+spec:
+  selector:
+    app: apachewebsite
+  ports:
+    - protocol: TCP
+      port: 80        # Service port
+      targetPort: 80  # Container port
+      nodePort: 30080 # Optional: fixed NodePort
+  type: NodePort      # Change to LoadBalancer if using cloud provider
+
+
+and then copy this pipeline code -> at forked repo add a Jenkins file and paste it and change 
+
+
+pipeline {
+    agent any
+      environment {
+        DOCKER_IMAGE = 'anirudev/apachewebsite:latest'
+        KUBECONFIG = credentials('kubeconfig')
+    }
+
+    stages {
+        stage('Clone Git repository') {
+            steps {
+                 git 'https://github.com/RaksAniruddha/apachewebsite.git'
+            }
+        }
+        stage('run ansibleplaybook'){
+          steps{
+            ansiblePlaybook credentialsId: 'ansible-ssh', installation: 'ansible2', inventory: 'inventory.ini', playbook: 'installapche.yml', vaultTmpPath: ''
+          }
+        }
+       stage('Docker Build & Push') {
+        steps {
+            script {
+                withDockerRegistry([credentialsId: 'docker', url: 'https://index.docker.io/v1/']) {
+                    sh '''
+                    echo "Building Docker image..."
+                    docker build --no-cache -t $DOCKER_IMAGE -f Dockerfile .
+                    echo "Pushing Docker image to Docker Hub..."
+                    docker push $DOCKER_IMAGE
+                    '''
+                    }
+                }
+            }
+        }
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+                        sh '''
+                        echo "Deploying to Kubernetes..."
+                        export KUBECONFIG=$KUBECONFIG_FILE
+
+                        kubectl apply -f deployment.yml
+                        kubectl apply -f service.yml
+
+                        echo "Deployment and Service applied successfully!"
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
+
+Now copy the playbook code from bellow create a file name installapche.yml and paste it in that  
+---
+- name: Install and start Apache on Ubuntu
+  hosts: all
+  become: yes
+  tasks:
+    - name: Update apt package index
+      apt:
+        update_cache: yes
+
+    - name: Install Apache2
+      apt:
+        name: apache2
+        state: present
+
+    - name: Ensure Apache2 is running and enabled
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+ 
+
+ 
+
+ 
+ 
+
+Now go to your jenkins
+Clicj on tools -> anisble-> name : ansible-> /usr/bin
+Docker-> name : docker-> add installer-> latest->apply save 
+
+ 
+
+ 
+
+
+No w go to Jenkins-> go to new item -> pipeline-> ok-> click on pipeline syntax ->click on ansible playbook-> Playbook file path in workspace : give your github playbook filename in my case installpache.yml-> Inventory file path in workspace: inventory.ini (because my github filename is inventory.ini)-> select ssh key-> generate pipeline script-> copy it paste on pipeline{          steps{
+            ansiblePlaybook credentialsId: 'ansible-ssh', installation: 'ansible2', inventory: 'inventory.ini', playbook: 'installapche.yml', vaultTmpPath: ''
+          }}
+
+Similary 
+Again  click on pipeline syntax-> select git -> give repo url -> branch (master/main)-> generate pipeline script and paste it at clone stage {         stage('Clone Git repository') {
+            steps {
+                 git 'https://github.com/RaksAniruddha/apachewebsite.git'
+            }
+        }
+}
+
+
+ 
+
+ 
+
+Now in the pipeline slelect checkout from scm -> give repository url-> slect branch master -> apply _> save-> run 
+ 
+ 
+
+ 
+
+
+Kubectl get pods -o wide
+Kubectl get svc -o wide
+
+You will got at port collum 80:<external_port>
+In my case 80:30080  so I copy 30080 
+Then go to your browser <publicipof node>:30080
+ 
