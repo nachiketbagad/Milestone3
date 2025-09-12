@@ -1,0 +1,303 @@
+PROJECT 
+
+FLOW 👍
+
+ 
+
+
+We will launch 3 aws ubuntu machines - t3.medium with all traffic enabled in the security group and use ebs as 20 gb storage
+
+1st machine : jenkins , docker , k8s  (master machine) 
+2nd and 3rd machines: k8s nodes
+Use this document to install kubernetes https://github.com/akshu20791/Deployment-script/blob/main/readme-k8s
+
+We will install jenkins in the master machine as well:
+wget https://raw.githubusercontent.com/akshu20791/Deployment-script/main/jenkins.sh
+  ls
+  chmod +x jenkins.sh
+  ./jenkins.sh
+
+
+
+### NOW WILL GO TO THE PROJECT REPO : https://github.com/akshu20791/cicdakshat/
+
+
+Fork the project 
+
+ 
+
+After this you can use the repo by yourself and make the changes as well
+
+Create a new folder 
+Open git bash 
+And clone the repo 
+
+
+ 
+
+
+# cd cicdakshat
+
+# gir branch devops1
+
+# git checkout devops1
+
+
+Create a file …..start tracking thee file …commit
+
+ 
+
+
+# git push -u origin devops1
+
+
+(in the pop up appeared put the  Personal access token for the token keys) 
+
+##########################
+
+
+You will go to the github repo 
+
+
+
+ 
+
+For now we will not raise the pull request…first lets create  pipeline
+
+
+We will open jenkins which we installed in the master
+
+
+ 
+
+
+ 
+
+ 
+
+Use source as git
+
+
+
+ 
+
+(you can put your forked branch)
+
+
+ 
+
+ 
+
+It will periodically check for every 1 min and if there is any update on github then it will build the project
+
+
+
+
+ 
+
+
+ 
+
+
+(if builds failed we are fine because we have not configured alot of things as of now) 
+
+
+Go to jenkins dashboard
+
+
+Go to manage jenkins
+
+ 
+
+
+ 
+
++ Add credential
+
+Here i will be create dockerhub credentials so that my code can be pushed to dockerhub
+ 
+
+
+
+
+
+## We will now install some plugins 
+
+
+Go to manage jenkins 
+We will install docker plugins
+
+
+ 
+
+We will also install kubenetes plugin 
+To install kubernetes plugin 👍 -> we will download a plugin locally from github and upload it on jenkins
+
+Go to  https://github.com/akshu20791/cicdakshat/blob/master/kubernetes-cd.hpi
+ 
+
+
+
+ 
+
+ 
+
+
+ 
+
+
+
+
+
+## go to master machine
+
+ 
+
+
+# service jenkins restart
+
+
+ 
+
+
+Now lets once check the jenkinsfile
+
+
+
+
+ 
+
+
+
+After updating it…we will generate the kubeconfigid 
+
+
+
+ 
+## RUN IN MASTER 
+
+cd ~
+ ls -a
+ cd .kube
+  ls
+ cat config
+
+
+Copy the whole content which came up
+
+ 
+
+Go to jenkins - manage jenkins - credentials - global 
+Add credentials
+
+ 
+
+ 
+
+ 
+
+Create
+
+Lets execute the pipeline 
+
+ 
+
+ 
+
+The deployment is not happening in the branch as we have put the condition in the jenkinsfile that if the branch is master then only the deployment will happen
+
+ 
+
+
+Now developer and manager is confirmed and they wanted to deploy the project…so the developer will not raise the pull request to the manager
+
+Either you can click on pull request rab and raise pull request or
+
+ 
+
+
+
+
+ 
+ 
+
+
+My jenkins pipeline should trigger
+
+My master branch is triggered automatically
+
+ 
+
+ 
+
+
+
+
+
+Now lets see how we can access the project
+
+Go to master
+
+
+
+ 
+
+
+Copy the publi ip of any node :30322
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
